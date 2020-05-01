@@ -1,5 +1,5 @@
 import React, { useReducer, useContext } from 'react';
-import { Alert } from 'react-native';
+import { Alert, findNodeHandle } from 'react-native';
 import { TodoContext } from './todoContext';
 import { todoReducer } from './todoReducer';
 import {
@@ -39,17 +39,24 @@ export const TodoState = ({ children }) => {
 
   const fetchTodos = async () => {
     showLoader();
-    const response = await fetch(
-      'https://rn-todo-app-ed22f.firebaseio.com/todos.json',
-      {
-        method: 'GET',
-        headers: { 'Content-Type': 'application/json' },
-      }
-    );
-    const data = await response.json();
-    const todos = Object.keys(data).map((key) => ({ ...data[key], id: key }));
-    dispatch({ type: FETCH_TODOS, todos });
-    hideLoader();
+    clearError();
+    try {
+      const response = await fetch(
+        'https://rn-todo-app-ed22f.firebaseio.com/todos.json',
+        {
+          method: 'GET',
+          headers: { 'Content-Type': 'application/json' },
+        }
+      );
+      const data = await response.json();
+      const todos = Object.keys(data).map((key) => ({ ...data[key], id: key }));
+      dispatch({ type: FETCH_TODOS, todos });
+    } catch (e) {
+      showError('Что-то пошло не так...');
+      console.log(e);
+    } finally {
+      hideLoader();
+    }
   };
 
   const removeTodo = (id) => {
@@ -64,8 +71,15 @@ export const TodoState = ({ children }) => {
         },
         {
           text: 'Удалить',
-          onPress: () => {
+          onPress: async () => {
             changeScreen(null);
+            await fetch(
+              `https://rn-todo-app-ed22f.firebaseio.com/todos/${id}.json`,
+              {
+                method: 'DELETE',
+                headers: { 'Content-Type': 'aplication/json' },
+              }
+            );
             dispatch({ type: REMOVE_TODO, id });
           },
         },
@@ -73,8 +87,19 @@ export const TodoState = ({ children }) => {
       { cancelable: false }
     );
   };
-  const updateTodo = (id, title) => dispatch({ type: UPDATE_TODO, id, title });
-
+  const updateTodo = async (id, title) => {
+    try {
+      await fetch(`https://rn-todo-app-ed22f.firebaseio.com/todos/${id}.json`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'aplication/json' },
+        body: JSON.stringify({ title }),
+      });
+      dispatch({ type: UPDATE_TODO, id, title });
+    } catch (e) {
+      showError('Что-то пошло не так...');
+      console.log(e);
+    }
+  };
   const showLoader = () => dispatch({ type: SHOW_LOADER });
 
   const hideLoader = () => dispatch({ type: HIDE_LOADER });
